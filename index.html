@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leitor de modelagem · MRBL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mat:#22473A; --mat-deep:#1A3A2F; --mat-line:rgba(255,255,255,.09); --mat-line-strong:rgba(255,255,255,.2);
+  --paper:#FFFFFF; --ink:#1A1F1C; --ink-soft:#56605A; --rule:#DCE0DC;
+  --ficha:#F2D2BD; --chalk:#F4C542; --notch:#C8553D;
+  --display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--mat);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+body{
+  min-height:100vh;
+  background-color:var(--mat);
+  background-image:
+    linear-gradient(var(--mat-line-strong) 1px,transparent 1px),
+    linear-gradient(90deg,var(--mat-line-strong) 1px,transparent 1px),
+    linear-gradient(var(--mat-line) 1px,transparent 1px),
+    linear-gradient(90deg,var(--mat-line) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+/* régua */
+.ruler{position:sticky;top:0;z-index:5;height:30px;overflow:hidden;background:var(--chalk);
+  background-image:
+    repeating-linear-gradient(90deg,var(--ink) 0 1px,transparent 1px 10px),
+    repeating-linear-gradient(90deg,var(--ink) 0 1.5px,transparent 1.5px 50px),
+    repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 100px);
+  background-size:100% 7px,100% 12px,100% 18px;background-repeat:no-repeat;background-position:0 0;
+  padding-top:env(safe-area-inset-top,0px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.ruler span{position:absolute;bottom:3px;font:600 11px var(--mono);color:var(--ink)}
+.wrap{max-width:1080px;margin:0 auto;padding:36px 20px 60px}
+header{color:#fff;margin-bottom:26px}
+h1{font:700 clamp(40px,7vw,68px)/.95 var(--display);letter-spacing:.01em;text-transform:uppercase;margin:0}
+h1 em{font-style:normal;color:var(--chalk)}
+.lede{margin:12px 0 0;max-width:60ch;color:rgba(255,255,255,.82)}
+/* zona de soltar */
+.drop{display:block;border:2px dashed rgba(255,255,255,.5);border-radius:6px;padding:40px 24px;text-align:center;color:#fff;cursor:pointer;transition:background .15s,border-color .15s}
+.drop:hover,.drop.over{background:rgba(255,255,255,.06);border-color:var(--chalk)}
+.drop:focus-within{outline:3px solid var(--chalk);outline-offset:3px}
+.drop strong{display:block;font:600 26px var(--display);text-transform:uppercase;letter-spacing:.03em}
+.drop small{display:block;margin-top:6px;color:rgba(255,255,255,.7)}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+/* etiqueta (card) com pique */
+.tag{position:relative;background:var(--paper);margin-top:26px;padding:22px 24px 18px;border-radius:3px;box-shadow:0 10px 24px rgba(0,0,0,.28);
+  clip-path:polygon(0 0,100% 0,100% calc(50% - 9px),calc(100% - 12px) 50%,100% calc(50% + 9px),100% 100%,0 100%,0 calc(50% + 9px),12px 50%,0 calc(50% - 9px))}
+.tag-head{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--rule);padding-bottom:12px;margin-bottom:16px}
+.ref{font:600 clamp(22px,3.4vw,30px) var(--mono);letter-spacing:-.01em}
+.meta{color:var(--ink-soft);font-size:13px}
+.ctrl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft)}
+select,button{font:500 13px var(--body);border:1px solid #B9C0BA;background:#fff;color:var(--ink);border-radius:3px;padding:6px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--ink)}
+button:focus-visible,select:focus-visible{outline:3px solid var(--chalk);outline-offset:2px}
+/* tabela no formato da ficha */
+.ficha-wrap{overflow-x:auto}
+table.ficha{border-collapse:collapse;width:100%;min-width:760px;table-layout:fixed}
+.ficha th,.ficha td{border:1px solid #9AA39C;text-align:center;padding:6px 4px}
+.ficha caption{background:var(--ficha);border:1px solid #9AA39C;border-bottom:0;font:700 12px var(--body);letter-spacing:.04em;padding:5px}
+.ficha th{font:500 11px/1.2 var(--body);text-transform:uppercase;color:var(--ink-soft)}
+.ficha td{font:600 20px var(--mono)}
+.ficha td.zero{color:#B7BDB8;font-weight:400}
+.ficha td .v{display:block;font:500 11px var(--body);color:var(--notch)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.alerts{list-style:none;margin:14px 0 0;padding:0}
+.alerts li{padding:7px 10px 7px 30px;position:relative;font-size:13.5px;border-top:1px solid var(--rule)}
+.alerts li::before{content:"";position:absolute;left:8px;top:11px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:11px solid var(--chalk)}
+.alerts li.warn::before{border-top-color:var(--notch)}
+.detail{margin-top:14px;overflow-x:auto}
+.detail table{border-collapse:collapse;width:100%;font-size:13px}
+.detail th{text-align:left;font:600 11px var(--body);text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid var(--ink);padding:6px 8px}
+.detail td{border-bottom:1px solid var(--rule);padding:6px 8px;vertical-align:top}
+.detail td.mono{font-family:var(--mono)}
+.err{color:var(--notch);font-weight:500}
+.foot{margin-top:40px;color:rgba(255,255,255,.7);font-size:13px;max-width:70ch}
+.foot b{color:#fff}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:3px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="ruler" aria-hidden="true" id="ruler"></div>
+<main class="wrap">
+  <header>
+    <h1>Leitor de <em>modelagem</em></h1>
+    <p class="lede">Solte o arquivo .dgs e receba a quantidade de moldes por material, no mesmo formato da ficha mestre. Conta só os moldes que vão para produção.</p>
+  </header>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".dgs" multiple>
+    <strong>Solte os arquivos .dgs aqui</strong>
+    <small>ou clique para escolher. Pode mandar vários de uma vez. A leitura acontece no seu navegador e o arquivo não é enviado para lugar nenhum.</small>
+  </label>
+
+  <section id="results" aria-live="polite"></section>
+
+  <p class="foot"><b>Regras de contagem.</b> Quantidade = peças de corte de cada material, somadas em todos os moldes de produção. Moldes com "viés" no nome aparecem separados (ex.: 6 + 1 viés). Materiais com nome GABARITO sem indicação de tipo contam como gabarito de costura. "ENTRETELA 2" conta como reforço por padrão, exceto no cliente 21, onde conta como segunda entretela. Dá para trocar em cada arquivo.</p>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<script>
+// ===== Leitor DGS (EGPR) =====
+const DGS = (() => {
+  const MARK = [0xdc, 0xeb, 0x95, 0xd3];
+  const isPR = c => (c >= 32 && c < 127) || c >= 0xc0;
+  const txt = (d, a, b) => { let s = ''; for (let i = a; i < b; i++) s += String.fromCharCode(d[i]); return s; };
+  const u32 = (d, p) => (d[p] | (d[p + 1] << 8) | (d[p + 2] << 16) | (d[p + 3] << 24)) >>> 0;
+
+  function pieceAt(d, p, lim) {
+    const len = d.length;
+    const L = d[p];
+    if (L === undefined || L > 60) return null;
+    for (let i = p + 1; i < p + 1 + L; i++) if (!isPR(d[i])) return null;
+    const name = txt(d, p + 1, p + 1 + L);
+    if (L && !name.trim()) return null;
+    let q = p + 1 + L;
+    const OL = d[q];
+    if (OL === undefined) return null;
+    for (let i = q + 1; i < q + 1 + OL; i++) { const c = d[i]; if (!(isPR(c) || c === 9 || c === 10 || c === 13)) return null; }
+    const obs = txt(d, q + 1, q + 1 + OL).trim();
+    const c = q + 1 + OL + 49;
+    if (c + 4 > len) return null;
+    const n = u32(d, c);
+    if (n < 1 || n > 10) return null;
+    q = c + 4;
+    const mats = [];
+    for (let k = 0; k < n; k++) {
+      if (q >= len) return null;
+      const ML = d[q];
+      if (ML < 2 || ML > 40 || q + 1 + ML + 16 > len) return null;
+      let pr = 0; for (let i = q + 1; i < q + 1 + ML; i++) if (isPR(d[i])) pr++;
+      if (pr < ML - 2) return null;
+      const mname = txt(d, q + 1, q + 1 + ML).trim();
+      q += 1 + ML;
+      if (q + 4 > len) return null;
+      const n1 = u32(d, q);
+      if (n1 < 1 || n1 > 30 || q + 8 + 8 * n1 > len) return null;
+      const qty = []; for (let i = 0; i < n1; i++) qty.push(u32(d, q + 4 + 4 * i));
+      q += 4 + 4 * n1;
+      const n2 = u32(d, q);
+      if (n2 !== n1) return null;
+      const prs = []; for (let i = 0; i < n2; i++) prs.push(u32(d, q + 4 + 4 * i));
+      q += 4 + 4 * n2;
+      if (Math.max(...qty) > 200 || Math.max(...prs) > 100) return null;
+      mats.push({ name: mname, qty, pairs: prs });
+    }
+    if (lim != null && q !== lim) return null;
+    return { name, obs, mats, end: q };
+  }
+
+  function findMark(d) {
+    outer: for (let i = 0; i < d.length - 4; i++) {
+      for (let j = 0; j < 4; j++) if (d[i + j] !== MARK[j]) continue outer;
+      return i;
+    }
+    return -1;
+  }
+
+  function parse(buf) {
+    const d = new Uint8Array(buf);
+    if (txt(d, 0, 4) !== 'EGPR') return { error: 'Este arquivo não é um DGS de modelagem (cabeçalho EGPR não encontrado).' };
+    const L = d[16];
+    const internalRef = txt(d, 17, 17 + L).trim();
+    const m = findMark(d);
+    if (m < 0) return { error: 'Não encontrei a lista de moldes de produção neste arquivo.', internalRef };
+    const declared = u32(d, m + 4);
+    const pieces = [];
+    let p = m + 12;
+    while (p < d.length - 60 && pieces.length < declared) {
+      const r = pieceAt(d, p, null);
+      if (r) { pieces.push(r); p = r.end; } else p++;
+    }
+    return { internalRef, declared, pieces };
+  }
+
+  function refKeys(s) {
+    s = String(s || '').toUpperCase().replace(/\.DGS$/, '').replace(/\(.*?\)/g, '');
+    const parts = s.split(/\s*-+\s*|\s+X(?=\d)|(?<=X)(?=\d)|\s+/).filter(x => x.trim());
+    const out = []; let base = null;
+    for (const p of parts) {
+      const k = p.replace(/[^0-9A-Z]/g, '');
+      if (!k) continue;
+      let mm = k.match(/^(\d{3})0?(\d{2})(\d{5}[A-Z]?)$/);
+      if (mm) { base = mm[1] + mm[2]; out.push(base + mm[3]); }
+      else if (/^\d{5}[A-Z]?$/.test(k) && base) out.push(base + k);
+      else if (/^\d{4}[A-Z]?$/.test(k) && base) out.push(base + '0' + k);
+    }
+    return out;
+  }
+  const fmtRef = k => `${k.slice(0, 3)}.${k.slice(3, 5)}.${k.slice(5)}`;
+  return { parse, refKeys, fmtRef };
+})();
+
+// ===== Regras de contagem =====
+const COLS = ['TECIDO 1', 'TECIDO 2', 'TECIDO 3', 'FORRO', 'ENTRETELA 1', 'ENTRETELA 2', 'ENTRETELA 3', 'ENTRE REFORÇO', 'GAB PREPARAÇÃO', 'GAB ACABAMENTO', 'GAB COSTURA'];
+const noAccent = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function classify(material, ent2AsReforco) {
+  const raw = material;
+  let m = noAccent(material.toUpperCase()).replace(/\s+/g, ' ').trim();
+  let fixed = m.replace(/^TCEIDO/, 'TECIDO').replace(/^TECIODO/, 'TECIDO');
+  const typo = fixed !== m;
+  m = fixed;
+  let col = null;
+  if (/^GABARITO\s*(ACB|ACAB)/.test(m)) col = 'GAB ACABAMENTO';
+  else if (/^GABARITO\s*PREP/.test(m)) col = 'GAB PREPARAÇÃO';
+  else if (/^GABARITO/.test(m)) col = 'GAB COSTURA';
+  else if (/^ENTRETELA\s*REFOR/.test(m)) col = 'ENTRE REFORÇO';
+  else if (/^ENTRETELA\s*3/.test(m)) col = 'ENTRETELA 3';
+  else if (/^ENTRETELA\s*2/.test(m)) col = ent2AsReforco ? 'ENTRE REFORÇO' : 'ENTRETELA 2';
+  else if (/^ENTRETELA/.test(m)) col = 'ENTRETELA 1';
+  else if (/^FORRO/.test(m)) col = 'FORRO';
+  else if (/^TECIDO\s*(PRINCIPAL|1)/.test(m)) col = 'TECIDO 1';
+  else if (/^TECIDO\s*2/.test(m)) col = 'TECIDO 2';
+  else if (/^TECIDO\s*3/.test(m)) col = 'TECIDO 3';
+  const odd = typo || (col && /\d$/.test(m) && /PRINCIPAL\d/.test(m));
+  return { col, typo: odd, raw };
+}
+
+function count(parsed, opts) {
+  const totals = Object.fromEntries(COLS.map(c => [c, { n: 0, vies: 0 }]));
+  const others = {}; const alerts = []; const typos = new Set(); const sizeDiff = new Set();
+  let noName = 0;
+  for (const p of parsed.pieces) {
+    if (!p.name.trim()) noName++;
+    const isVies = /VIES/.test(noAccent(p.name.toUpperCase()));
+    for (const mt of p.mats) {
+      const q = mt.qty[0];
+      if (new Set(mt.qty).size > 1) sizeDiff.add(p.name.trim() || '(sem nome)');
+      const c = classify(mt.name, opts.ent2AsReforco);
+      if (c.typo) typos.add(`${mt.name} → ${c.col}`);
+      if (!c.col) { others[mt.name] = (others[mt.name] || 0) + q; continue; }
+      if (isVies) totals[c.col].vies += q; else totals[c.col].n += q;
+    }
+  }
+  if (parsed.pieces.length < parsed.declared)
+    alerts.push({ level: 'warn', text: `Li ${parsed.pieces.length} de ${parsed.declared} moldes de produção. Algum molde tem um formato que o leitor ainda não reconhece, então os totais podem estar abaixo do real.` });
+  if (noName) alerts.push({ level: 'warn', text: `${noName} molde(s) sem nome no arquivo.` });
+  for (const t of typos) alerts.push({ level: 'info', text: `Material com nome fora do padrão: ${t}.` });
+  for (const [k, v] of Object.entries(others)) alerts.push({ level: 'warn', text: `Material não reconhecido: "${k}" (${v} peça${v > 1 ? 's' : ''}). Não entrou em nenhuma coluna.` });
+  for (const s of sizeDiff) alerts.push({ level: 'info', text: `O molde "${s}" tem quantidades diferentes entre tamanhos. Usei a do primeiro tamanho.` });
+  return { totals, alerts };
+}
+
+
+(function ruler(){const r=document.getElementById('ruler');let h='';for(let i=1;i<60;i++)h+=`<span style="left:${i*100+3}px">${i*10}</span>`;r.innerHTML=h;})();
+
+const $res=document.getElementById('results');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),1600);}
+
+function cellText(t){return t.vies?`${t.n}+${t.vies} VIÉS`:String(t.n);}
+
+function render(card,st){
+  const {file,parsed}=st;
+  if(parsed.error){card.innerHTML=`<div class="tag-head"><span class="ref">${esc(file.name)}</span></div><p class="err">${esc(parsed.error)}</p>`;return;}
+  const fk=DGS.refKeys(file.name), ik=DGS.refKeys(parsed.internalRef);
+  const key=fk[0]||ik[0]||'';
+  const res=count(parsed,{ent2AsReforco:st.ent2AsReforco});
+  const alerts=[...res.alerts];
+  if(fk.length&&ik.length&&fk[0]!==ik[0]) alerts.unshift({level:'warn',text:`A referência no nome do arquivo (${DGS.fmtRef(fk[0])}) é diferente da gravada dentro dele (${esc(parsed.internalRef)}).`});
+  if(!ik.length) alerts.unshift({level:'info',text:'O arquivo não tem a referência gravada internamente.'});
+  const refLabel=key?DGS.fmtRef(key):(parsed.internalRef||file.name);
+  const head=COLS.map(c=>`<th scope="col">${c}</th>`).join('');
+  const row=COLS.map(c=>{const t=res.totals[c];const z=!t.n&&!t.vies;return `<td class="${z?'zero':''}">${t.n}${t.vies?`<span class="v">+${t.vies} viés</span>`:''}</td>`}).join('');
+  card.innerHTML=`
+    <div class="tag-head">
+      <div><div class="ref">${esc(refLabel)}</div><div class="meta">${esc(file.name)} · ${parsed.pieces.length} moldes de produção</div></div>
+      <label class="ctrl">"ENTRETELA 2" do arquivo conta como
+        <select data-k="ent2"><option value="1"${st.ent2AsReforco?' selected':''}>Reforço</option><option value="0"${st.ent2AsReforco?'':' selected'}>Entretela 2</option></select>
+      </label>
+    </div>
+    <div class="ficha-wrap"><table class="ficha"><caption>QUANTIDADE DE MOLDES</caption><thead><tr>${head}</tr></thead><tbody><tr>${row}</tr></tbody></table></div>
+    <div class="actions">
+      <button data-k="copy">Copiar valores</button>
+      <button data-k="detail" aria-expanded="${st.open?'true':'false'}">${st.open?'Esconder moldes':'Ver moldes'}</button>
+    </div>
+    ${alerts.length?`<ul class="alerts">${alerts.map(a=>`<li class="${a.level}">${a.text}</li>`).join('')}</ul>`:''}
+    ${st.open?detailTable(parsed,st):''}`;
+  card.querySelector('[data-k=ent2]').onchange=e=>{st.ent2AsReforco=e.target.value==='1';render(card,st);};
+  card.querySelector('[data-k=detail]').onclick=()=>{st.open=!st.open;render(card,st);};
+  card.querySelector('[data-k=copy]').onclick=async()=>{
+    const tsv=COLS.map(c=>cellText(res.totals[c])).join('\t');
+    try{await navigator.clipboard.writeText(tsv);toast('Valores copiados. Cole na planilha ou na ficha.');}catch{toast('Não consegui copiar. Selecione a tabela manualmente.');}
+  };
+}
+function detailTable(parsed,st){
+  const rows=parsed.pieces.map(p=>{
+    const mats=p.mats.map(m=>{const c=classify(m.name,st.ent2AsReforco);return `${esc(m.name)} <span class="meta">→ ${c.col||'não reconhecido'}</span> × ${m.qty[0]}${m.qty.length>1?` <span class="meta">(${m.qty.length} tam.)</span>`:''}`}).join('<br>');
+    return `<tr><td>${p.name.trim()?esc(p.name):'<span class="err">(sem nome)</span>'}</td><td>${mats}</td><td>${esc(p.obs).replace(/\r?\n/g,'<br>')}</td></tr>`}).join('');
+  return `<div class="detail"><table><thead><tr><th>Molde</th><th>Material → coluna × qtd</th><th>Observação</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function handle(files){
+  for(const file of files){
+    if(!/\.dgs$/i.test(file.name)){toast(`${file.name} não é .dgs e foi ignorado.`);continue;}
+    const buf=await file.arrayBuffer();
+    const parsed=DGS.parse(buf);
+    const key=DGS.refKeys(file.name)[0]||DGS.refKeys(parsed.internalRef||'')[0]||'';
+    const st={file,parsed,ent2AsReforco:key.slice(3,5)!=='21',open:false};
+    const card=document.createElement('article');card.className='tag';
+    $res.prepend(card);render(card,st);
+  }
+}
+const drop=document.getElementById('drop'),inp=document.getElementById('file');
+inp.onchange=e=>{handle([...e.target.files]);inp.value='';};
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>handle([...e.dataTransfer.files]));
+</script>
+</body>
+</html>
